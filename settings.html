@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Settings</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css">
+ 
+
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a class="nav-back" href="index.html">← Back to Menu</a>
+    <div class="nav-title">MP4orce</div>
+  </nav>
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <p class="page-eyebrow">Configuration</p>
+    <h1 class="page-title">Settings</h1>
+    <p class="page-sub">Adjust your experience before entering battle</p>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="settings-wrap">
+
+    <!-- AUDIO -->
+    <div class="section-header">
+      <div class="section-header-line"></div>
+      <div class="section-header-label">Audio</div>
+      <div class="section-header-line"></div>
+    </div>
+
+    <div class="setting-row" style="--accent:#4ff7a0;">
+      <div class="setting-icon">♪</div>
+      <div class="setting-info">
+        <div class="setting-name">Music Volume</div>
+        <div class="setting-desc">Background music and battle themes</div>
+      </div>
+      <div class="setting-control">
+        <div class="slider-wrap">
+          <input type="range" id="music-vol" min="0" max="100" value="70" oninput="updateSlider('music-vol','music-val')"/>
+          <span class="slider-val" id="music-val">70%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-row" style="--accent:#4f8ef7;">
+      <div class="setting-icon">◈</div>
+      <div class="setting-info">
+        <div class="setting-name">Sound Effects</div>
+        <div class="setting-desc">Hit sounds, skill effects, and UI clicks</div>
+      </div>
+      <div class="setting-control">
+        <div class="slider-wrap">
+          <input type="range" id="sfx-vol" min="0" max="100" value="85" oninput="updateSlider('sfx-vol','sfx-val')"/>
+          <span class="slider-val" id="sfx-val">85%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-row" style="--accent:#f74f4f;">
+      <div class="setting-icon">◉</div>
+      <div class="setting-info">
+        <div class="setting-name">Mute All Audio</div>
+        <div class="setting-desc">Silence everything including music and effects</div>
+      </div>
+      <div class="setting-control">
+        <label class="toggle">
+          <input type="checkbox" id="mute-all" onchange="handleMute()"/>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- GAMEPLAY -->
+    <div class="section-header">
+      <div class="section-header-line"></div>
+      <div class="section-header-label">Gameplay</div>
+      <div class="section-header-line"></div>
+    </div>
+
+    <div class="setting-row" style="--accent:#f74f4f;">
+      <div class="setting-icon">☠</div>
+      <div class="setting-info">
+        <div class="setting-name">Difficulty</div>
+        <div class="setting-desc">Affects enemy HP, ATK, and AI aggressiveness</div>
+      </div>
+      <div class="setting-control">
+        <div class="select-group" id="diff-group">
+          <button class="sel-btn" onclick="selectOption('diff-group',this)" style="--accent:#4ff7a0;">Easy</button>
+          <button class="sel-btn active" onclick="selectOption('diff-group',this)" style="--accent:#f7e24f;">Normal</button>
+          <button class="sel-btn" onclick="selectOption('diff-group',this)" style="--accent:#f74f4f;">Hard</button>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="setting-row" style="--accent:#f7e24f;">
+      <div class="setting-icon">✦</div>
+      <div class="setting-info">
+        <div class="setting-name">Show Damage Texts</div>
+        <div class="setting-desc">Display floating damage and heal values during combat</div>
+      </div>
+      <div class="setting-control">
+        <label class="toggle">
+          <input type="checkbox" id="show-dmg" checked/>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- DISPLAY -->
+    <div class="section-header">
+      <div class="section-header-line"></div>
+      <div class="section-header-label">Display & Language</div>
+      <div class="section-header-line"></div>
+    </div>
+
+    <div class="setting-row" style="--accent:#4f8ef7;">
+      <div class="setting-icon">◉</div>
+      <div class="setting-info">
+        <div class="setting-name">Screen Shake</div>
+        <div class="setting-desc">Unit cards shake when hit during battle</div>
+      </div>
+      <div class="setting-control">
+        <label class="toggle">
+          <input type="checkbox" id="screen-shake" checked/>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <div class="setting-row" style="--accent:#4f8ef7;">
+      <div class="setting-icon">◈</div>
+      <div class="setting-info">
+        <div class="setting-name">Language</div>
+        <div class="setting-desc">Game text and UI language</div>
+      </div>
+      <div class="setting-control">
+        <select class="lang-select" id="lang-select">
+          <option value="en">English</option>
+          <option value="my">Burmese</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- SAVE ROW -->
+    <div class="save-row">
+      <button class="btn-reset" onclick="resetDefaults()">Reset to Defaults</button>
+      <button class="btn-save" onclick="saveSettings()">Save Settings</button>
+    </div>
+
+  </div>
+
+  <div id="save-toast">✓ Settings Saved</div>
+  <script src="settings.js"></script>
+
+ 
+
+</body>
+</html>

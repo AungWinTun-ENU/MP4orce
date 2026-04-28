@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The MP4orce - Login</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="menu">
+      <h1>The MP4orce</h1>
+      <p class="subtitle">Login</p>
+
+      <div class="img-wrapper">
+        <img src="img/mp4.png" alt="MP4orce Logo" />
+      </div>
+
+      <form id="login-form">
+        <ul>
+          <li>
+            <input id="username" type="text" placeholder="Username" required />
+          </li>
+          <li>
+            <input id="email" type="email" placeholder="Email" required />
+          </li>
+          <li>
+            <input id="password" type="password" placeholder="Password" required />
+          </li>
+          <li>
+            <input id="confirm-password" type="password" placeholder="Confirm Password" required />
+          </li>
+          <li>
+            <button class="button" type="submit">Sign Up</button>
+          </li>
+        </ul>
+      </form>
+      <br>
+
+      <div class="login-redirect">
+       
+        <button class="button" onclick="window.location.href='login.html'">Log In Instead?</button>
+      </div>
+    </div>
+
+
+    <br> 
+    <a href="index.html" class="about-back-link">← Back to Menu</a>
+
+    <script src="storage.js"></script>
+  </body>
+</html>

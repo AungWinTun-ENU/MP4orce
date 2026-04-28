@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Battlefield</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  
+</head>
+<body>
+  <div id="game-title">⚔ Battlefield ⚔</div>
+  <div id="level-display">CHAPTER I</div>
+  <div id="turn-indicator">AWAITING BATTLE…</div>
+  <div id="target-hint"></div>
+
+  <!-- ARENA -->
+  <div id="arena">
+
+    <!-- HERO SIDE -->
+    <div class="side-column" id="hero-team">
+
+     
+      <div class="static-hero-card" style="border-color:rgba(232,64,64,0.3);">
+        <div class="unit-info-row">
+          <div class="static-portrait" style="background:radial-gradient(circle at 40% 40%,rgba(232,64,64,0.25),rgba(232,64,64,0.05));border-color:rgba(232,64,64,0.6);"></div>
+          <div>
+            <div class="unit-name" style="color:#e84040">Samkaith</div>
+            <div class="unit-class">MP1</div>
+          </div>
+        </div>
+        <div class="hp-bar-wrap"><div class="static-hp-bar" style="width:100%;background:linear-gradient(90deg,#e84040bb,#e84040);"></div></div>
+        <div class="hp-text">320 / 320 HP</div>
+      </div>
+
+      <!-- card 2: Dummling -->
+      <div class="static-hero-card" style="border-color:rgba(58,155,232,0.3);">
+        <div class="unit-info-row">
+          <div class="static-portrait" style="background:radial-gradient(circle at 40% 40%,rgba(58,155,232,0.25),rgba(58,155,232,0.05));border-color:rgba(58,155,232,0.6);"></div>
+          <div>
+            <div class="unit-name" style="color:#3a9be8">Dummling</div>
+            <div class="unit-class">MP2</div>
+          </div>
+        </div>
+        <div class="hp-bar-wrap"><div class="static-hp-bar" style="width:100%;background:linear-gradient(90deg,#3a9be8bb,#3a9be8);"></div></div>
+        <div class="hp-text">270 / 270 HP</div>
+      </div>
+
+      <!-- card 3: Genji -->
+      <div class="static-hero-card" style="border-color:rgba(78,203,110,0.3);">
+        <div class="unit-info-row">
+          <div class="static-portrait" style="background:radial-gradient(circle at 40% 40%,rgba(78,203,110,0.25),rgba(78,203,110,0.05));border-color:rgba(78,203,110,0.6);"></div>
+          <div>
+            <div class="unit-name" style="color:#4ecb6e">Genji</div>
+            <div class="unit-class">MP3</div>
+          </div>
+        </div>
+        <div class="hp-bar-wrap"><div class="static-hp-bar" style="width:100%;background:linear-gradient(90deg,#4ecb6ebb,#4ecb6e);"></div></div>
+        <div class="hp-text">300 / 300 HP</div>
+      </div>
+
+      <!-- card 4: KK -->
+      <div class="static-hero-card" style="border-color:rgba(240,192,64,0.3);">
+        <div class="unit-info-row">
+          <div class="static-portrait" style="background:radial-gradient(circle at 40% 40%,rgba(240,192,64,0.25),rgba(240,192,64,0.05));border-color:rgba(240,192,64,0.6);"></div>
+          <div>
+            <div class="unit-name" style="color:#f0c040">KK</div>
+            <div class="unit-class">MP4</div>
+          </div>
+        </div>
+        <div class="hp-bar-wrap"><div class="static-hp-bar" style="width:100%;background:linear-gradient(90deg,#f0c040bb,#f0c040);"></div></div>
+        <div class="hp-text">290 / 290 HP</div>
+      </div>
+
+    </div><!-- /#hero-team -->
+
+    <!-- VS -->
+    <div id="vs-divider">
+      <div class="vs-line"></div>
+      <div class="vs-text">VS</div>
+      <div class="vs-line"></div>
+    </div>
+
+    <!-- ENEMY SIDE -->
+    <div class="side-column" id="enemy-team">
+
+      <!-- Static enemy card: Dark Minion -->
+      <div class="static-enemy-card" style="border-color:rgba(204,85,102,0.3);">
+        <div class="unit-info-row">
+          <div class="static-portrait" style="color:#cc5566;font-family:'Cinzel',serif;font-size:1.4rem;font-weight:700;border-color:rgba(204,85,102,0.4);">R</div>
+          <div>
+            <div class="unit-name" style="color:#cc5566">Rex</div>
+            <div class="unit-class">Villain</div>
+          </div>
+        </div>
+        <div class="hp-bar-wrap"><div class="static-hp-bar" style="width:100%;background:linear-gradient(90deg,var(--hp-green),var(--hp-green)cc);"></div></div>
+        <div class="hp-text">240 / 240 HP</div>
+      </div>
+
+       <div class="static-enemy-card" style="border-color:rgba(204,85,102,0.3);">
+        <div class="unit-info-row">
+          <div class="static-portrait" style="color:#cc5566;font-family:'Cinzel',serif;font-size:1.4rem;font-weight:700;border-color:rgba(204,85,102,0.4);">D</div>
+          <div>
+            <div class="unit-name" style="color:#cc5566">Dokoku</div>
+            <div class="unit-class">Villain</div>
+          </div>
+        </div>
+        <div class="hp-bar-wrap"><div class="static-hp-bar" style="width:100%;background:linear-gradient(90deg,var(--hp-green),var(--hp-green)cc);"></div></div>
+        <div class="hp-text">240 / 240 HP</div>
+      </div>
+
+       <div class="static-enemy-card" style="border-color:rgba(204,85,102,0.3);">
+        <div class="unit-info-row">
+          <div class="static-portrait" style="color:#cc5566;font-family:'Cinzel',serif;font-size:1.4rem;font-weight:700;border-color:rgba(204,85,102,0.4);">S</div>
+          <div>
+            <div class="unit-name" style="color:#cc5566">Sonoshi</div>
+            <div class="unit-class">Villain</div>
+          </div>
+        </div>
+        <div class="hp-bar-wrap"><div class="static-hp-bar" style="width:100%;background:linear-gradient(90deg,var(--hp-green),var(--hp-green)cc);"></div></div>
+        <div class="hp-text">240 / 240 HP</div>
+      </div>
+
+       <div class="static-enemy-card" style="border-color:rgba(204,85,102,0.3);">
+        <div class="unit-info-row">
+          <div class="static-portrait" style="color:#cc5566;font-family:'Cinzel',serif;font-size:1.4rem;font-weight:700;border-color:rgba(204,85,102,0.4);">R</div>
+          <div>
+            <div class="unit-name" style="color:#cc5566">Radiguet</div>
+            <div class="unit-class">Villain</div>
+          </div>
+        </div>
+        <div class="hp-bar-wrap"><div class="static-hp-bar" style="width:100%;background:linear-gradient(90deg,var(--hp-green),var(--hp-green)cc);"></div></div>
+        <div class="hp-text">240 / 240 HP</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== BATTLE LOG ===== -->
+  <div id="battle-log">
+    <div id="log-box">
+      <div class="log-line" style="opacity:1;transform:none;">⚔ The battle awaits…</div>
+    </div>
+  </div>
+
+  <!-- ===== SKILL BAR ===== -->
+  <div id="skill-bar">
+    <!-- Static skill buttons (always visible, just look inert without JS) -->
+    <button class="action-btn" id="btn0">
+     <i class="fa-solid fa-khanda"></i>
+      <span class="skill-name">Attack</span>
+      <span class="xp-cost">FREE</span>
+      <span class="skill-desc"></span>
+    </button>
+    <button class="action-btn" id="btn1">
+      <i class="bi bi-fire"></i>
+      <span class="skill-name">Skill 1</span>
+      <span class="xp-cost">2 XP</span>
+      <span class="skill-desc"></span>
+    </button>
+    <button class="action-btn" id="btn2">
+     <i class="fa-solid fa-hand-fist"></i>
+      <span class="skill-name">Skill 2</span>
+      <span class="xp-cost">3 XP</span>
+      <span class="skill-desc"></span>
+    </button>
+    <button class="action-btn" id="btn3">
+      <i class="fa-solid fa-heart"></i>
+      <span class="skill-name">Skill 3</span>
+      <span class="xp-cost">2 XP</span>
+      <span class="skill-desc"></span>
+    </button>
+  </div>
+
+  <!-- ===== XP PANEL ===== -->
+  <div id="xp-panel">
+    <div class="hero-xp-wrap">
+      <div class="hero-xp-label" style="color:#e84040">Samkaith</div>
+      <div class="xp-bar-wrap"><div class="xp-bar" style="width:0%"></div></div>
+      <div class="xp-count">0 XP</div>
+    </div>
+    <div class="hero-xp-wrap">
+      <div class="hero-xp-label" style="color:#3a9be8">Dummling</div>
+      <div class="xp-bar-wrap"><div class="xp-bar" style="width:0%"></div></div>
+      <div class="xp-count">0 XP</div>
+    </div>
+    <div class="hero-xp-wrap">
+      <div class="hero-xp-label" style="color:#4ecb6e">Genji</div>
+      <div class="xp-bar-wrap"><div class="xp-bar" style="width:0%"></div></div>
+      <div class="xp-count">0 XP</div>
+    </div>
+    <div class="hero-xp-wrap">
+      <div class="hero-xp-label" style="color:#f0c040">KK</div>
+      <div class="xp-bar-wrap"><div class="xp-bar" style="width:0%"></div></div>
+      <div class="xp-count">0 XP</div>
+    </div>
+  </div>
+
+  <div id="xp-footer">⬡ Earn 1 XP per attack used &nbsp;·&nbsp; Spend XP to unlock skills</div>
+
+
+<script src="script.js"></script>
+</body>
+</html>
