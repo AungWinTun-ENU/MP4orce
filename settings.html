@@ -13,7 +13,8 @@
 
   <!-- NAV -->
   <nav>
-    <a class="nav-back" href="index.html">← Back to Menu</a>
+     <!-- This prevents the game from restarting when returning from settings -->
+    <a class="nav-back" href="javascript:void(0);" onclick="history.back();" id="nav-back-btn">← Back</a>
     <div class="nav-title">MP4orce</div>
   </nav>
 
@@ -161,8 +162,7 @@
 
   <div id="save-toast">✓ Settings Saved</div>
   <script src="settings.js"></script>
-
- 
+  
 
 </body>
 </html>

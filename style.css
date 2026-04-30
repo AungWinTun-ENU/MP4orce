@@ -47,6 +47,7 @@
    BODY — fullscreen, no scroll for game page
    ══════════════════════════════════════════ */
 body {
+ 
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -54,6 +55,7 @@ body {
   justify-content: center;
   background-color: var(--dark);
   background-image:
+  
     radial-gradient(
       ellipse 80% 60% at 50% 0%,
       rgba(79, 142, 247, 0.15) 0%,
@@ -621,8 +623,8 @@ li:nth-child(2) { animation-delay: 0.5s; }
 
 /* ── Portrait box — spacing between image and border ── */
 .static-portrait {
-  width: 70px;
-  height: 60px;
+  width: 50px;
+  height: 55px;
   border-radius: 8px;
   background: rgba(0,0,0,0.4);
   border: 1px solid rgba(255,255,255,0.1);

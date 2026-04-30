@@ -1,17 +1,19 @@
 // ============================================================
-//  BATTLEFIELD — game.js  (Full rewrite)
+//  BATTLEFIELD — game.js  (Final version)
+//  • Auth popup (login / play as guest)
 //  • 3 villain phases / waves
-//  • Hero & villain portrait images  (images/*.png)
+//  • Hero & villain portrait images (img/*.png)
 //  • Status effects: Burn, Freeze, Stun
 //  • Combo counter + critical hits
 //  • Phase-transition cinematic screen
-//  • Battle animations & skill flash effects
+//  • Leaderboard recording on victory
+//  • Improved turn indicator & hint UI
 //  BGM credit: Eric Matyas — www.soundimage.org
 // ============================================================
 "use strict";
 
 // ═══════════════════════════════════════════════════════════
-//  SETTINGS  (from localStorage via settings.js)
+//  SETTINGS
 // ═══════════════════════════════════════════════════════════
 
 const SETTING_DEFAULTS = {
@@ -90,7 +92,26 @@ const Audio = (() => {
   };
   function startBGM(key="battle") {
     if (!bgmEl) { bgmEl=document.createElement("audio"); bgmEl.loop=true; document.body.appendChild(bgmEl); }
-    bgmEl.pause(); bgmEl.volume=bgmV(); bgmEl.src=BGM[key]||BGM.battle; bgmEl.load(); bgmEl.play().catch(()=>{});
+    bgmEl.pause();
+    bgmEl.volume = bgmV();
+    bgmEl.src = BGM[key] || BGM.battle;
+    bgmEl.load();
+
+    const doPlay = () => {
+      bgmEl.play().catch(err => {
+        // Retry once after short delay (handles autoplay policy edge cases)
+        setTimeout(() => bgmEl.play().catch(()=>{}), 300);
+      });
+    };
+
+    // Always try to resume AudioContext before playing
+    if (!ctx) {
+      doPlay();
+    } else if (ctx.state === "suspended" || ctx.state === "interrupted") {
+      ctx.resume().then(doPlay).catch(doPlay);
+    } else {
+      doPlay();
+    }
   }
   function stopBGM()       { if(bgmEl){ bgmEl.pause(); bgmEl.src=""; } }
   function syncBGMVolume() { if(bgmEl) bgmEl.volume=bgmV(); }
@@ -110,7 +131,6 @@ const scale = () => DIFF[CFG.difficulty]||DIFF.Normal;
 //  GAME DATA
 // ═══════════════════════════════════════════════════════════
 
-// Status effect definitions
 const STATUS = {
   burn:   { icon:"🔥", label:"Burn",   color:"#f74f4f", turns:3, dmgPerTurn:12 },
   freeze: { icon:"❄",  label:"Freeze", color:"#4ff7f7", turns:2 },
@@ -122,75 +142,68 @@ const HEROES = [
     id:"samkaith", name:"Samkaith", cls:"MP1", maxHp:320, color:"#e84040",
     img:"img/samkaith.png",
     skills:[
-      { name:"Strike",        xpCost:0, dmg:[28,42], heal:0,  aoe:false, healTarget:"self", desc:"Sharp basic slash",           sfx:"attack", status:null },
-      { name:"Inferno Slash", xpCost:2, dmg:[55,80], heal:0,  aoe:false, healTarget:"self", desc:"Burn chance 60%",             sfx:"skill1", status:{type:"burn",  chance:.6} },
-      { name:"Quake Bash",    xpCost:3, dmg:[40,55], heal:0,  aoe:true,  healTarget:"self", desc:"AOE — stun chance 40%",       sfx:"skill2", status:{type:"stun",  chance:.4} },
-      { name:"War Cry",       xpCost:2, dmg:[0,0],   heal:55, aoe:false, healTarget:"ally", desc:"Rallies a wounded ally",      sfx:"heal",   status:null },
+      { name:"Strike",        xpCost:0, dmg:[28,42], heal:0,  aoe:false, healTarget:"self", desc:"Sharp basic slash",      sfx:"attack", status:null },
+      { name:"Inferno Slash", xpCost:2, dmg:[55,80], heal:0,  aoe:false, healTarget:"self", desc:"Burn chance 60%",        sfx:"skill1", status:{type:"burn",  chance:.6} },
+      { name:"Quake Bash",    xpCost:3, dmg:[40,55], heal:0,  aoe:true,  healTarget:"self", desc:"AOE — stun chance 40%",  sfx:"skill2", status:{type:"stun",  chance:.4} },
+      { name:"War Cry",       xpCost:2, dmg:[0,0],   heal:55, aoe:false, healTarget:"ally", desc:"Rallies a wounded ally", sfx:"heal",   status:null },
     ]
   },
   {
     id:"dummling", name:"Dummling", cls:"MP2", maxHp:270, color:"#3a9be8",
     img:"img/dummling.png",
     skills:[
-      { name:"Ice Shard",   xpCost:0, dmg:[22,36], heal:0,  aoe:false, healTarget:"self", desc:"Cold basic shot",              sfx:"attack", status:null },
-      { name:"Frost Bolt",  xpCost:2, dmg:[50,70], heal:0,  aoe:false, healTarget:"self", desc:"Freeze chance 55%",            sfx:"skill1", status:{type:"freeze",chance:.55} },
-      { name:"Blizzard",    xpCost:3, dmg:[35,50], heal:0,  aoe:true,  healTarget:"self", desc:"AOE — freeze all 35%",         sfx:"skill2", status:{type:"freeze",chance:.35} },
-      { name:"Mend",        xpCost:2, dmg:[0,0],   heal:55, aoe:false, healTarget:"self", desc:"Restore own HP",               sfx:"heal",   status:null },
+      { name:"Ice Shard",  xpCost:0, dmg:[22,36], heal:0,  aoe:false, healTarget:"self", desc:"Cold basic shot",        sfx:"attack", status:null },
+      { name:"Frost Bolt", xpCost:2, dmg:[50,70], heal:0,  aoe:false, healTarget:"self", desc:"Freeze chance 55%",      sfx:"skill1", status:{type:"freeze",chance:.55} },
+      { name:"Blizzard",   xpCost:3, dmg:[35,50], heal:0,  aoe:true,  healTarget:"self", desc:"AOE — freeze all 35%",   sfx:"skill2", status:{type:"freeze",chance:.35} },
+      { name:"Mend",       xpCost:2, dmg:[0,0],   heal:55, aoe:false, healTarget:"self", desc:"Restore own HP",         sfx:"heal",   status:null },
     ]
   },
   {
     id:"genji", name:"Genji", cls:"MP3", maxHp:300, color:"#4ecb6e",
     img:"img/genji.png",
     skills:[
-      { name:"Vine Lash",    xpCost:0, dmg:[25,40], heal:0,  aoe:false, healTarget:"self", desc:"Tangling whip strike",        sfx:"attack", status:null },
-      { name:"Thorn Strike", xpCost:2, dmg:[52,75], heal:0,  aoe:false, healTarget:"self", desc:"Burn chance 50%",             sfx:"skill1", status:{type:"burn",  chance:.5} },
-      { name:"Thorn Burst",  xpCost:3, dmg:[38,54], heal:0,  aoe:true,  healTarget:"self", desc:"AOE — burn all 40%",          sfx:"skill2", status:{type:"burn",  chance:.4} },
-      { name:"Rejuvenate",   xpCost:2, dmg:[0,0],   heal:60, aoe:false, healTarget:"ally", desc:"Heals an ally",               sfx:"heal",   status:null },
+      { name:"Vine Lash",    xpCost:0, dmg:[25,40], heal:0,  aoe:false, healTarget:"self", desc:"Tangling whip strike",  sfx:"attack", status:null },
+      { name:"Thorn Strike", xpCost:2, dmg:[52,75], heal:0,  aoe:false, healTarget:"self", desc:"Burn chance 50%",       sfx:"skill1", status:{type:"burn",  chance:.5} },
+      { name:"Thorn Burst",  xpCost:3, dmg:[38,54], heal:0,  aoe:true,  healTarget:"self", desc:"AOE — burn all 40%",    sfx:"skill2", status:{type:"burn",  chance:.4} },
+      { name:"Rejuvenate",   xpCost:2, dmg:[0,0],   heal:60, aoe:false, healTarget:"ally", desc:"Heals an ally",         sfx:"heal",   status:null },
     ]
   },
   {
     id:"kk", name:"KK", cls:"MP4", maxHp:290, color:"#f0c040",
     img:"img/kk.png",
     skills:[
-      { name:"Thunder Jab",  xpCost:0, dmg:[26,38], heal:0,  aoe:false, healTarget:"self", desc:"Quick electric jab",         sfx:"attack", status:null },
-      { name:"Thunder Fist", xpCost:2, dmg:[53,78], heal:0,  aoe:false, healTarget:"self", desc:"Stun chance 50%",             sfx:"skill1", status:{type:"stun",  chance:.5} },
-      { name:"Storm Surge",  xpCost:3, dmg:[42,58], heal:0,  aoe:true,  healTarget:"self", desc:"AOE — stun all 30%",          sfx:"skill2", status:{type:"stun",  chance:.3} },
-      { name:"Iron Will",    xpCost:2, dmg:[0,0],   heal:45, aoe:false, healTarget:"self", desc:"Fortifies own body",          sfx:"heal",   status:null },
+      { name:"Thunder Jab",  xpCost:0, dmg:[26,38], heal:0,  aoe:false, healTarget:"self", desc:"Quick electric jab",      sfx:"attack", status:null },
+      { name:"Thunder Fist", xpCost:2, dmg:[53,78], heal:0,  aoe:false, healTarget:"self", desc:"Stun chance 50%",          sfx:"skill1", status:{type:"stun",  chance:.5} },
+      { name:"Storm Surge",  xpCost:3, dmg:[42,58], heal:0,  aoe:true,  healTarget:"self", desc:"AOE — stun all 30%",       sfx:"skill2", status:{type:"stun",  chance:.3} },
+      { name:"Iron Will",    xpCost:2, dmg:[0,0],   heal:45, aoe:false, healTarget:"self", desc:"Fortifies own body",       sfx:"heal",   status:null },
     ]
   },
 ];
 
-// 3 Villain phases — each wave escalates
 const VILLAIN_WAVES = [
-  // Phase 1 — The Scouts
   {
-    phase:1, title:"CHAPTER I", subtitle:"The Villains Arrive",
-    bgmKey:"battle",
+    phase:1, title:"CHAPTER I", subtitle:"The Villains Arrive", bgmKey:"battle",
     enemies:[
-      { id:"rex",      name:"Rex",      cls:"Villain",    baseHp:240, baseDmgMin:20, baseDmgMax:38, letter:"R", color:"#cc5566", img:"images/rex.png",      statusChance:.20, statusPool:["burn"] },
-      { id:"dokoku",   name:"Dokoku",   cls:"Villain",    baseHp:240, baseDmgMin:22, baseDmgMax:40, letter:"D", color:"#cc5566", img:"images/dokoku.png",   statusChance:.20, statusPool:["stun"] },
-      { id:"sonoshi",  name:"Sonoshi",  cls:"Villain",    baseHp:240, baseDmgMin:18, baseDmgMax:35, letter:"S", color:"#cc5566", img:"images/sonoshi.png",  statusChance:.15, statusPool:["burn","freeze"] },
-      { id:"radiguet", name:"Radiguet", cls:"Villain",    baseHp:260, baseDmgMin:25, baseDmgMax:45, letter:"R", color:"#cc5566", img:"images/radiguet.png", statusChance:.25, statusPool:["freeze"] },
+      { id:"rex",      name:"Rex",      cls:"Villain",  baseHp:240, baseDmgMin:20, baseDmgMax:38, letter:"R", color:"#cc5566", img:"img/rex.png",      statusChance:.20, statusPool:["burn"] },
+      { id:"dokoku",   name:"Dokoku",   cls:"Villain",  baseHp:240, baseDmgMin:22, baseDmgMax:40, letter:"D", color:"#cc5566", img:"img/dokoku.png",   statusChance:.20, statusPool:["stun"] },
+      { id:"sonoshi",  name:"Sonoshi",  cls:"Villain",  baseHp:240, baseDmgMin:18, baseDmgMax:35, letter:"S", color:"#cc5566", img:"img/sonoshi.png",  statusChance:.15, statusPool:["burn","freeze"] },
+      { id:"radiguet", name:"Radiguet", cls:"Villain",  baseHp:260, baseDmgMin:25, baseDmgMax:45, letter:"R", color:"#cc5566", img:"img/radiguet.png", statusChance:.25, statusPool:["freeze"] },
     ]
   },
-  // Phase 2 — The Elites
   {
-    phase:2, title:"CHAPTER II", subtitle:"The Elites Strike Back",
-    bgmKey:"phase2",
+    phase:2, title:"CHAPTER II", subtitle:"The Elites Strike Back", bgmKey:"phase2",
     enemies:[
-      { id:"darkblade", name:"Darkblade", cls:"Elite",      baseHp:320, baseDmgMin:30, baseDmgMax:52, letter:"D", color:"#c060ff", img:"images/darkblade.png", statusChance:.30, statusPool:["burn","stun"] },
-      { id:"vexor",     name:"Vexor",     cls:"Elite",      baseHp:300, baseDmgMin:28, baseDmgMax:50, letter:"V", color:"#c060ff", img:"images/vexor.png",     statusChance:.30, statusPool:["freeze"] },
-      { id:"krael",     name:"Krael",     cls:"Elite",      baseHp:340, baseDmgMin:32, baseDmgMax:55, letter:"K", color:"#c060ff", img:"images/krael.png",     statusChance:.25, statusPool:["burn","freeze","stun"] },
+      { id:"darkblade", name:"Nezirejia", cls:"Elite",   baseHp:320, baseDmgMin:30, baseDmgMax:52, letter:"D", color:"#c060ff", img:"img/nezirejia.png", statusChance:.30, statusPool:["burn","stun"] },
+      { id:"vexor",     name:"Gengetsu",     cls:"Elite",   baseHp:300, baseDmgMin:28, baseDmgMax:50, letter:"V", color:"#c060ff", img:"img/gengetsu.png",     statusChance:.30, statusPool:["freeze"] },
+      { id:"krael",     name:"Grandiene",     cls:"Elite",   baseHp:340, baseDmgMin:32, baseDmgMax:55, letter:"K", color:"#c060ff", img:"img/grandiene.png",     statusChance:.25, statusPool:["burn","freeze","stun"] },
     ]
   },
-  // Phase 3 — The Overlord
   {
-    phase:3, title:"CHAPTER III", subtitle:"The Overlord Awakens",
-    bgmKey:"phase3",
+    phase:3, title:"CHAPTER III", subtitle:"The Overlord Awakens", bgmKey:"phase3",
     enemies:[
-      { id:"sentinel",  name:"Sentinel",  cls:"Warlord",    baseHp:380, baseDmgMin:35, baseDmgMax:58, letter:"S", color:"#ff6030", img:"images/sentinel.png",  statusChance:.35, statusPool:["burn","stun"] },
-      { id:"necrovex",  name:"Necrovex",  cls:"Warlord",    baseHp:400, baseDmgMin:38, baseDmgMax:62, letter:"N", color:"#ff6030", img:"images/necrovex.png",  statusChance:.35, statusPool:["freeze","stun"] },
-      { id:"overlord",  name:"Overlord",  cls:"★ BOSS ★",   baseHp:600, baseDmgMin:48, baseDmgMax:80, letter:"Ω", color:"#ffd700", img:"images/overlord.png",  statusChance:.45, statusPool:["burn","freeze","stun"] },
+      { id:"sentinel", name:"N-Ma",  cls:"Warlord",  baseHp:380, baseDmgMin:35, baseDmgMax:58, letter:"S", color:"#ff6030", img:"img/nma.png",  statusChance:.35, statusPool:["burn","stun"] },
+      { id:"necrovex", name:"Long",  cls:"Warlord",  baseHp:400, baseDmgMin:38, baseDmgMax:62, letter:"N", color:"#ff6030", img:"img/long.png",  statusChance:.35, statusPool:["freeze","stun"] },
+      { id:"overlord", name:"Dagded",  cls:"★ BOSS ★", baseHp:600, baseDmgMin:48, baseDmgMax:80, letter:"Ω", color:"#ffd700", img:"img/dagded.png",  statusChance:.45, statusPool:["burn","freeze","stun"] },
     ]
   },
 ];
@@ -199,12 +212,12 @@ function buildEnemies(waveIdx) {
   const { hp, dmg } = scale();
   return VILLAIN_WAVES[waveIdx].enemies.map(e => ({
     ...e,
-    maxHp:  Math.round(e.baseHp      * hp),
-    minDmg: Math.round(e.baseDmgMin  * dmg),
-    maxDmg: Math.round(e.baseDmgMax  * dmg),
-    hp:     Math.round(e.baseHp      * hp),
+    maxHp:  Math.round(e.baseHp     * hp),
+    minDmg: Math.round(e.baseDmgMin * dmg),
+    maxDmg: Math.round(e.baseDmgMax * dmg),
+    hp:     Math.round(e.baseHp     * hp),
     alive:  true,
-    status: null,   // current status effect object or null
+    status: null,
     statusTurns: 0,
   }));
 }
@@ -217,17 +230,17 @@ function buildEnemies(waveIdx) {
 const state = {
   heroes:[], enemies:[],
   heroIndex:0,
-  phase:"hero",        // "hero"|"enemy"|"target"|"heal-target"|"cinematic"|"over"
+  phase:"hero",
   pendingSkill:null,
   xp:[0,0,0,0],
   maxXp:6,
   audioStarted:false,
-  waveIndex:0,         // 0=phase1, 1=phase2, 2=phase3
-  combo:0,             // consecutive hero hits without taking damage
+  waveIndex:0,
+  combo:0,
   lastHitWasHero:false,
-   totalDmgDealt: 0,
-  totalDmgTaken: 0,
-  totalCrits:    0,
+  totalDmgDealt:0,
+  totalDmgTaken:0,
+  totalCrits:0,
 };
 
 
@@ -248,6 +261,81 @@ function injectSettingsIcon() {
 
 
 // ═══════════════════════════════════════════════════════════
+//  AUTH POPUP
+// ═══════════════════════════════════════════════════════════
+
+function showAuthPopup() {
+  const popup = document.createElement("div");
+  popup.id = "auth-popup";
+  popup.style.cssText = `
+    position:fixed;inset:0;z-index:999;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(6,11,20,0.92);backdrop-filter:blur(8px);
+    animation:fadeIn .35s ease;`;
+
+  popup.innerHTML = `
+    <div style="
+      background:var(--panel);border:1px solid var(--border);border-radius:14px;
+      padding:36px 32px 28px;max-width:340px;width:90%;
+      text-align:center;position:relative;
+      box-shadow:0 0 60px rgba(79,142,247,0.15),0 24px 60px rgba(0,0,0,0.7);">
+      <div style="position:absolute;top:-1px;left:-1px;width:16px;height:16px;
+        border-top:2px solid var(--gold);border-left:2px solid var(--gold);border-radius:2px 0 0 0;"></div>
+      <div style="position:absolute;bottom:-1px;right:-1px;width:16px;height:16px;
+        border-bottom:2px solid var(--gold);border-right:2px solid var(--gold);border-radius:0 0 2px 0;"></div>
+      <div style="font-size:2rem;margin-bottom:12px;">⚔</div>
+      <div style="font-family:'Orbitron',sans-serif;font-size:0.85rem;font-weight:700;
+        letter-spacing:0.12em;color:var(--gold);text-shadow:0 0 14px var(--gold);margin-bottom:8px;">
+        LOGIN REQUIRED
+      </div>
+      <div style="font-family:'Rajdhani',sans-serif;font-size:0.95rem;color:var(--text-dim);
+        letter-spacing:0.05em;margin-bottom:28px;line-height:1.5;">
+        You need to be signed in<br>to enter the battlefield.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button id="popup-login-btn" style="
+          width:100%;padding:12px;font-family:'Orbitron',sans-serif;font-size:0.7rem;
+          font-weight:700;letter-spacing:0.18em;text-transform:uppercase;
+          background:rgba(200,168,75,0.12);border:1px solid var(--gold);
+          border-radius:7px;color:var(--gold);cursor:pointer;transition:all .2s;">
+          SIGN IN
+        </button>
+        <button id="popup-guest-btn" style="
+          width:100%;padding:12px;font-family:'Orbitron',sans-serif;font-size:0.7rem;
+          font-weight:700;letter-spacing:0.18em;text-transform:uppercase;
+          background:rgba(79,142,247,0.08);border:1px solid var(--border);
+          border-radius:7px;color:var(--text-dim);cursor:pointer;transition:all .2s;">
+          PLAY AS GUEST
+        </button>
+        <a href="index.html" style="
+          font-family:'Orbitron',sans-serif;font-size:0.58rem;letter-spacing:0.2em;
+          color:var(--text-muted);text-decoration:none;margin-top:4px;
+          transition:color .2s;display:block;">
+          ← BACK TO MENU
+        </a>
+      </div>
+    </div>`;
+
+  document.body.appendChild(popup);
+
+  const loginBtn = document.getElementById("popup-login-btn");
+  const guestBtn = document.getElementById("popup-guest-btn");
+
+  loginBtn.onmouseenter = () => { loginBtn.style.background="var(--gold)"; loginBtn.style.color="var(--bg)"; };
+  loginBtn.onmouseleave = () => { loginBtn.style.background="rgba(200,168,75,0.12)"; loginBtn.style.color="var(--gold)"; };
+  guestBtn.onmouseenter = () => { guestBtn.style.borderColor="var(--blue)"; guestBtn.style.color="var(--text)"; };
+  guestBtn.onmouseleave = () => { guestBtn.style.borderColor="var(--border)"; guestBtn.style.color="var(--text-dim)"; };
+
+  loginBtn.onclick = () => window.location.href = "login.html";
+  guestBtn.onclick = () => {
+    localStorage.setItem("bf_session", "Guest");
+    popup.remove();
+    init();
+  };
+}
+
+
+// ═══════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════
 
@@ -255,14 +343,17 @@ function init() {
   CFG = loadCFG();
   Audio.syncBGMVolume();
 
-  state.heroes     = HEROES.map(h => ({ ...h, hp:h.maxHp, alive:true, status:null, statusTurns:0 }));
-  state.waveIndex  = 0;
-  state.enemies    = buildEnemies(0);
-  state.heroIndex  = 0;
-  state.phase      = "hero";
-  state.xp         = [0,0,0,0];
-  state.audioStarted = false;
-  state.combo      = 0;
+  state.heroes        = HEROES.map(h => ({ ...h, hp:h.maxHp, alive:true, status:null, statusTurns:0 }));
+  state.waveIndex     = 0;
+  state.enemies       = buildEnemies(0);
+  state.heroIndex     = 0;
+  state.phase         = "hero";
+  state.xp            = [0,0,0,0];
+  state.audioStarted  = false;
+  state.combo         = 0;
+  state.totalDmgDealt = 0;
+  state.totalDmgTaken = 0;
+  state.totalCrits    = 0;
 
   buildHeroCards();
   buildEnemyCards();
@@ -301,15 +392,15 @@ function buildHeroCards() {
     card.id = `hero-card-${i}`;
     card.style.borderColor = hexA(h.color, 0.3);
     card.style.position = "relative";
-   card.innerHTML = `
-  <div class="unit-info-row">
-    <div class="static-portrait" id="hero-portrait-${i}" style="
-      background:radial-gradient(circle at 40% 40%,${hexA(h.color,.25)},${hexA(h.color,.04)});
-      border-color:${hexA(h.color,.55)};overflow:hidden;padding:5px;">
-      <img src="${h.img}" alt="${h.name}"
-        style="width:100%;height:100%;object-fit:cover;border-radius:4px;"
-        onerror="this.style.display='none';this.parentNode.innerHTML='<span style=font-size:1.5rem;color:${h.color}>${h.name[0]}</span>'">
-    </div>
+    card.innerHTML = `
+      <div class="unit-info-row">
+        <div class="static-portrait" id="hero-portrait-${i}" style="
+          background:radial-gradient(circle at 40% 40%,${hexA(h.color,.25)},${hexA(h.color,.04)});
+          border-color:${hexA(h.color,.55)};overflow:hidden;padding:5px;">
+          <img src="${h.img}" alt="${h.name}"
+            style="width:100%;height:100%;object-fit:cover;border-radius:4px;display:block;"
+            onerror="this.style.display='none';this.parentNode.innerHTML='<span style=font-size:1.5rem;color:${h.color}>${h.name[0]}</span>'">
+        </div>
         <div style="flex:1;min-width:0;">
           <div class="unit-name" style="color:${h.color}">${h.name}</div>
           <div class="unit-class">${h.cls}</div>
@@ -330,7 +421,6 @@ function buildHeroCards() {
 function buildEnemyCards() {
   const col = document.getElementById("enemy-team");
   col.innerHTML = "";
-  const wave = VILLAIN_WAVES[state.waveIndex];
   state.enemies.forEach((e, i) => {
     const card = document.createElement("div");
     card.className = "static-enemy-card";
@@ -339,9 +429,9 @@ function buildEnemyCards() {
     card.innerHTML = `
       <div class="unit-info-row">
         <div class="static-portrait" id="enemy-portrait-${i}" style="
-          color:${e.color};border-color:${hexA(e.color,.5)};overflow:hidden;padding:0;">
+          color:${e.color};border-color:${hexA(e.color,.5)};overflow:hidden;padding:5px;">
           <img src="${e.img}" alt="${e.name}"
-            style="width:100%;height:100%;object-fit:cover;border-radius:6px;"
+            style="width:100%;height:100%;object-fit:cover;border-radius:4px;display:block;"
             onerror="this.style.display='none';this.parentNode.innerHTML='<span style=font-size:1.5rem;font-weight:700;color:${e.color}>${e.letter}</span>'">
         </div>
         <div style="flex:1;min-width:0;">
@@ -390,9 +480,8 @@ function buildComboDisplay() {
 }
 
 function updateChapterDisplay() {
-  const wave = VILLAIN_WAVES[state.waveIndex];
   const el = document.getElementById("level-display");
-  if (el) el.textContent = wave.title;
+  if (el) el.textContent = VILLAIN_WAVES[state.waveIndex].title;
 }
 
 
@@ -439,7 +528,6 @@ function onSkillClick(skillIdx) {
   const skill = hero.skills[skillIdx];
   if (skill.xpCost > state.xp[state.heroIndex]) return;
 
-  // Stunned? Skip turn
   if (hero.status === "stun") {
     logLine(`⚡ ${hero.name} is stunned and cannot act!`);
     Audio.SFX.stun();
@@ -449,8 +537,6 @@ function onSkillClick(skillIdx) {
   state.xp[state.heroIndex] -= skill.xpCost;
   updateXpDisplay(state.heroIndex);
   if (Audio.SFX[skill.sfx]) Audio.SFX[skill.sfx]();
-
-  // Flash screen
   triggerSkillFlash(skill.sfx === "heal" ? "#4ecb6e" : "#e84040");
 
   if (skill.heal > 0) {
@@ -530,7 +616,6 @@ function onAllyClick(idx) {
   endHeroTurn();
 }
 
-// ── Critical hit: 15% base, higher with combos ──
 function calcDamage(min, max) {
   const critChance = 0.15 + Math.min(state.combo * 0.04, 0.35);
   const isCrit = Math.random() < critChance;
@@ -590,13 +675,10 @@ function enemyTurn() {
   alive.forEach(enemy => {
     setTimeout(() => {
       if (state.phase !== "enemy") return;
-
-      // Frozen enemy skips
       if (enemy.status === "freeze") {
-        logLine(`${enemy.name} is frozen and cannot attack!`);
+        logLine(`❄ ${enemy.name} is frozen and cannot attack!`);
         Audio.SFX.freeze(); return;
       }
-
       const target = liveH[Math.floor(Math.random() * liveH.length)];
       const hi     = state.heroes.indexOf(target);
       const dmg    = rand(enemy.minDmg, enemy.maxDmg);
@@ -604,9 +686,7 @@ function enemyTurn() {
       Audio.SFX.enemyHit();
       if (CFG.showDmg)     spawnDmgFloat(`hero-card-${hi}`, `-${dmg}`, "damage");
       if (CFG.screenShake) shakeCard(`hero-card-${hi}`);
-      logLine(`${enemy.name} → ${target.name}: ${dmg} dmg!`);
-
-      // Enemy may apply status to hero
+      logLine(`💀 ${enemy.name} → ${target.name}: ${dmg} dmg!`);
       if (Math.random() < enemy.statusChance) {
         const st = enemy.statusPool[Math.floor(Math.random()*enemy.statusPool.length)];
         maybeApplyStatus(target, st, 1.0, `hero-status-${hi}`, true);
@@ -640,18 +720,14 @@ function startNextHeroTurn() {
 //  STATUS EFFECTS
 // ═══════════════════════════════════════════════════════════
 
-// Apply to hero (isHero=true) or enemy (isHero=false)
 function maybeApplyStatus(unit, type, chance, badgeId, isHero=false) {
-  if (unit.status === type) return;       // already affected
-  if (Math.random() > chance) return;     // didn't proc
-
+  if (unit.status === type) return;
+  if (Math.random() > chance) return;
   unit.status = type;
   unit.statusTurns = STATUS[type].turns;
-
   const def = STATUS[type];
   const badge = document.getElementById(badgeId);
   if (badge) badge.innerHTML = `<span style="color:${def.color}">${def.icon} ${def.label} (${def.turns}t)</span>`;
-
   Audio.SFX[type] && Audio.SFX[type]();
   logLine(`${def.icon} ${unit.name} is afflicted with ${def.label}!`);
 }
@@ -659,12 +735,9 @@ function maybeApplyStatus(unit, type, chance, badgeId, isHero=false) {
 function tickStatusEffects(side) {
   const units  = side === "heroes" ? state.heroes : state.enemies;
   const prefix = side === "heroes" ? "hero-status" : "enemy-status";
-
   units.forEach((unit, i) => {
     if (!unit.status || !unit.alive) return;
     const def = STATUS[unit.status];
-
-    // Burn deals damage each tick
     if (unit.status === "burn" && def.dmgPerTurn) {
       const dmg = def.dmgPerTurn;
       unit.hp = Math.max(0, unit.hp - dmg);
@@ -674,7 +747,6 @@ function tickStatusEffects(side) {
       if (CFG.showDmg) spawnDmgFloat(`${side==="heroes"?"hero":"enemy"}-card-${i}`, `-${dmg}🔥`, "damage");
       logLine(`🔥 ${unit.name} takes ${dmg} burn damage!`);
     }
-
     unit.statusTurns--;
     if (unit.statusTurns <= 0) {
       logLine(`✨ ${unit.name} recovered from ${def.label}!`);
@@ -696,28 +768,20 @@ function tickStatusEffects(side) {
 function showPhaseTransition(waveIdx, callback) {
   state.phase = "cinematic";
   Audio.SFX.phaseChange();
-
   const wave = VILLAIN_WAVES[waveIdx];
   const screen = document.createElement("div");
   screen.id = "phase-screen";
   screen.style.cssText = `
     position:fixed;inset:0;z-index:900;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
-    background:rgba(6,11,20,.97);
-    animation:fadeIn .4s ease;`;
-
+    background:rgba(6,11,20,.97);animation:fadeIn .4s ease;`;
   screen.innerHTML = `
     <div style="font-family:'Orbitron',sans-serif;font-size:.7rem;letter-spacing:.5em;
-      color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">
-      ⚠ Enemies Defeated ⚠
-    </div>
+      color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">⚠ Enemies Defeated ⚠</div>
     <div style="font-family:'Orbitron',sans-serif;font-size:clamp(1.8rem,5vw,3rem);
-      font-weight:900;letter-spacing:.12em;
-      color:${waveIdx===2?"#ffd700":"var(--hp-red)"};
-      text-shadow:0 0 40px currentColor;
-      animation:titlePulse 1s infinite alternate;">
-      ${wave.title}
-    </div>
+      font-weight:900;letter-spacing:.12em;color:${waveIdx===2?"#ffd700":"var(--hp-red)"};
+      text-shadow:0 0 40px currentColor;animation:titlePulse 1s infinite alternate;">
+      ${wave.title}</div>
     <div style="font-family:'Rajdhani',sans-serif;font-size:1.1rem;color:var(--text-dim);
       letter-spacing:.1em;">${wave.subtitle}</div>
     <div style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
@@ -734,20 +798,12 @@ function showPhaseTransition(waveIdx, callback) {
     </div>
     <div style="margin-top:24px;font-family:'Orbitron',sans-serif;font-size:.65rem;
       color:var(--text-muted);letter-spacing:.2em;animation:blinkAnim .7s infinite alternate;">
-      PREPARE FOR BATTLE…
-    </div>`;
-
+      PREPARE FOR BATTLE…</div>`;
   document.body.appendChild(screen);
-
-  // Auto-dismiss after 3 seconds, then start the wave
   setTimeout(() => {
-    screen.style.animation = "none";
-    screen.style.opacity   = "0";
+    screen.style.opacity = "0";
     screen.style.transition = "opacity .4s";
-    setTimeout(() => {
-      screen.remove();
-      callback();
-    }, 400);
+    setTimeout(() => { screen.remove(); callback(); }, 400);
   }, 3000);
 }
 
@@ -756,6 +812,7 @@ function startNextWave() {
   state.enemies = buildEnemies(state.waveIndex);
   buildEnemyCards();
   updateChapterDisplay();
+  state.audioStarted = true; 
   Audio.startBGM(VILLAIN_WAVES[state.waveIndex].bgmKey);
   state.phase = "hero";
   highlightActiveHero();
@@ -771,7 +828,7 @@ function startNextWave() {
 
 function applyDamageToEnemy(idx, dmg, isCrit=false) {
   state.enemies[idx].hp = Math.max(0, state.enemies[idx].hp - dmg);
-  state.totalDmgDealt += dmg; 
+  state.totalDmgDealt += dmg;
   updateEnemyBar(idx);
   if (isCrit) { Audio.SFX.crit(); flashCard(`enemy-card-${idx}`, "#ffd700"); }
   else          flashCard(`enemy-card-${idx}`, "#e84040");
@@ -780,7 +837,7 @@ function applyDamageToEnemy(idx, dmg, isCrit=false) {
 
 function applyDamageToHero(idx, dmg) {
   state.heroes[idx].hp = Math.max(0, state.heroes[idx].hp - dmg);
-  state.totalDmgTaken += dmg; 
+  state.totalDmgTaken += dmg;
   updateHeroBar(idx);
 }
 
@@ -846,38 +903,38 @@ function checkHeroDeaths() {
 function checkVictory() {
   if (!state.enemies.every(e => !e.alive)) return false;
 
-  // More waves remain → phase transition
   if (state.waveIndex < VILLAIN_WAVES.length - 1) {
     const nextIdx = state.waveIndex + 1;
     logLine(`✅ Phase ${state.waveIndex+1} cleared! Brace for Phase ${nextIdx+1}…`);
     showPhaseTransition(nextIdx, startNextWave);
-    return true;  // pause hero turn flow during cinematic
+    return true;
   }
 
-  // All 3 phases done → true victory
+  // All 3 phases done — true victory
   state.phase = "over";
-  setTurnIndicator("VICTORY!");
-  logLine("All villains defeated! The heroes triumph!");
+  setTurnIndicator("✨ VICTORY!");
+  logLine("🏆 All villains defeated! The heroes triumph!");
   Audio.SFX.victory();
   setTimeout(() => Audio.startBGM("victory"), 900);
+
+  // Record to leaderboard
+  if (typeof window.recordBattleResult === "function") {
+    window.recordBattleResult({
+      dmgDealt: state.totalDmgDealt,
+      dmgTaken: state.totalDmgTaken,
+      crits:    state.totalCrits,
+    });
+  }
+
   showEndOverlay("victory");
   return true;
-}
-
-// Victory section 
-if (typeof window.recordBattleResult === "function") {
-  window.recordBattleResult({
-    dmgDealt: state.totalDmgDealt || 0,
-    dmgTaken: state.totalDmgTaken || 0,
-    crits:    state.totalCrits    || 0,
-  });
 }
 
 function checkDefeat() {
   if (!state.heroes.every(h => !h.alive)) return false;
   state.phase = "over";
-  setTurnIndicator(" DEFEAT");
-  logLine(" All heroes have fallen…");
+  setTurnIndicator("💀 DEFEAT");
+  logLine("💀 All heroes have fallen…");
   Audio.SFX.defeat();
   Audio.stopBGM();
   showEndOverlay("defeat");
@@ -1000,32 +1057,92 @@ function shakeCard(cardId) {
 
 function triggerSkillFlash(color="#e84040") {
   const el=document.createElement("div");
-  el.className="skill-flash";
-  el.style.background=color;
+  el.className="skill-flash"; el.style.background=color;
   document.body.appendChild(el);
   setTimeout(()=>el.remove(), 450);
 }
 
 function showEndOverlay(type) {
-  const isVic=type==="victory";
-  let ov=document.getElementById("overlay");
+  const isVic = type === "victory";
+  let ov = document.getElementById("overlay");
+
+  // Use existing HTML overlay if present
   if (ov) {
     ov.classList.add("show");
-    const t=document.getElementById("overlay-title"),b=document.getElementById("overlay-btn");
-    if(t){ t.textContent=isVic?"⚔ VICTORY ⚔":" DEFEAT "; t.style.color=isVic?"var(--gold)":"var(--hp-red)"; }
+    const t=document.getElementById("overlay-title"), b=document.getElementById("overlay-btn");
+    if(t){ t.textContent=isVic?"⚔ VICTORY ⚔":"💀 DEFEAT 💀"; t.style.color=isVic?"var(--gold)":"var(--hp-red)"; }
     if(b) b.onclick=()=>location.reload();
     return;
   }
+
+  // Build overlay dynamically
   ov=document.createElement("div"); ov.id="overlay";
-  ov.style.cssText=`position:fixed;inset:0;background:rgba(6,11,20,.9);z-index:800;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;animation:fadeIn .5s ease;`;
+  ov.style.cssText=`position:fixed;inset:0;background:rgba(6,11,20,.9);z-index:800;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:20px;animation:fadeIn .5s ease;`;
+
   const t=document.createElement("div");
-  t.style.cssText=`font-family:'Orbitron',sans-serif;font-size:clamp(2rem,6vw,3.5rem);font-weight:900;letter-spacing:.15em;text-align:center;color:${isVic?"var(--gold)":"var(--hp-red)"};text-shadow:0 0 40px currentColor;animation:titlePulse 1.5s infinite alternate;`;
-  t.textContent=isVic?" VICTORY ":" DEFEAT";
+  t.style.cssText=`font-family:'Orbitron',sans-serif;font-size:clamp(2rem,6vw,3.5rem);
+    font-weight:900;letter-spacing:.15em;text-align:center;
+    color:${isVic?"var(--gold)":"var(--hp-red)"};
+    text-shadow:0 0 40px currentColor;animation:titlePulse 1.5s infinite alternate;`;
+  t.textContent = isVic ? "⚔ VICTORY ⚔" : " DEFEAT ";
+
   const sub=document.createElement("div");
-  sub.style.cssText=`color:var(--text-dim);font-family:'Rajdhani',sans-serif;font-size:1rem;letter-spacing:.08em;`;
-  sub.textContent=isVic?"All 3 villain phases conquered!":"The darkness prevails…";
-  const btn=document.createElement("button"); btn.id="overlay-btn"; btn.textContent="PLAY AGAIN"; btn.onclick=()=>location.reload();
-  ov.append(t,sub,btn); document.body.appendChild(ov);
+  sub.style.cssText=`color:var(--text-dim);font-family:'Rajdhani',sans-serif;font-size:1rem;letter-spacing:.08em;text-align:center;`;
+  sub.textContent = isVic ? "All 3 villain phases conquered!" : "The darkness prevails…";
+
+  ov.append(t, sub);
+
+  // Stats summary on victory
+  if (isVic) {
+    const stats=document.createElement("div");
+    stats.style.cssText=`display:flex;gap:24px;flex-wrap:wrap;justify-content:center;
+      font-family:'Orbitron',sans-serif;font-size:0.65rem;letter-spacing:.12em;`;
+    stats.innerHTML=`
+      <div style="text-align:center;">
+        <div style="font-size:1.4rem;margin-bottom:4px;">⚔</div>
+        <div style="color:#fff;font-size:0.9rem;">${state.totalDmgDealt.toLocaleString()}</div>
+        <div style="color:var(--text-muted);">DMG DEALT</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:1.4rem;margin-bottom:4px;">🛡</div>
+        <div style="color:#fff;font-size:0.9rem;">${state.totalDmgTaken.toLocaleString()}</div>
+        <div style="color:var(--text-muted);">DMG TAKEN</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:1.4rem;margin-bottom:4px;">💥</div>
+        <div style="color:#fff;font-size:0.9rem;">${state.totalCrits.toLocaleString()}</div>
+        <div style="color:var(--text-muted);">CRITS</div>
+      </div>`;
+    ov.appendChild(stats);
+  }
+
+  // Buttons
+  const btnRow=document.createElement("div");
+  btnRow.style.cssText=`display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:4px;`;
+
+  const btnPlay=document.createElement("button");
+  btnPlay.id="overlay-btn"; btnPlay.textContent="PLAY AGAIN"; btnPlay.onclick=()=>location.reload();
+
+  btnRow.appendChild(btnPlay);
+
+  if (isVic) {
+    const btnLb=document.createElement("button");
+    btnLb.textContent="VIEW LEADERBOARD";
+    btnLb.style.cssText=`
+      padding:14px 28px;font-family:'Orbitron',sans-serif;font-size:0.8rem;
+      letter-spacing:.15em;background:rgba(78,203,110,.12);
+      border:2px solid var(--hp-green);color:var(--hp-green);
+      border-radius:4px;cursor:pointer;transition:all .2s;text-transform:uppercase;`;
+    btnLb.onmouseenter=()=>{ btnLb.style.background="var(--hp-green)"; btnLb.style.color="var(--bg)"; };
+    btnLb.onmouseleave=()=>{ btnLb.style.background="rgba(78,203,110,.12)"; btnLb.style.color="var(--hp-green)"; };
+    btnLb.onclick=()=>window.location.href="leaderboard.html";
+    btnRow.appendChild(btnLb);
+  }
+
+  ov.appendChild(btnRow);
+  document.body.appendChild(ov);
 }
 
 
@@ -1033,9 +1150,29 @@ function showEndOverlay(type) {
 //  UI HELPERS
 // ═══════════════════════════════════════════════════════════
 
-function setTurnIndicator(txt) { const e=document.getElementById("turn-indicator"); if(e) e.textContent=txt; }
-function setHint(txt)           { const e=document.getElementById("target-hint");    if(e) e.textContent=txt; }
-function clearHint()            { setHint(""); }
+function setTurnIndicator(txt) {
+  const e = document.getElementById("turn-indicator");
+  if (!e) return;
+  e.textContent = txt;
+  e.style.transition = "none";
+  e.style.transform  = "scale(1.15)";
+  e.style.color      = txt.includes("Enemy") ? "var(--hp-red)" : "var(--gold)";
+  setTimeout(() => {
+    e.style.transition = "transform .25s ease, color .25s ease";
+    e.style.transform  = "scale(1)";
+  }, 180);
+}
+
+function setHint(txt) {
+  const e = document.getElementById("target-hint");
+  if (!e) return;
+  e.textContent = txt;
+  e.style.fontSize   = txt ? "0.85rem" : "0.7rem";
+  e.style.fontFamily = txt ? "'Orbitron',sans-serif" : "";
+  e.style.color      = txt.toLowerCase().includes("heal") ? "var(--hp-green)" : "var(--hp-red)";
+}
+
+function clearHint() { setHint(""); }
 
 function logLine(msg) {
   const box=document.getElementById("log-box");
@@ -1059,4 +1196,11 @@ function hexA(hex,a)   { const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slic
 //  BOOT
 // ═══════════════════════════════════════════════════════════
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", () => {
+  const session = localStorage.getItem("bf_session");
+  if (!session) {
+    showAuthPopup();
+    return;
+  }
+  init();
+});
