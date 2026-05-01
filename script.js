@@ -114,6 +114,7 @@ if (ac.state === "suspended" || ac.state === "interrupted") {
   doPlay();
 }
   }
+  
   function stopBGM()       { if(bgmEl){ bgmEl.pause(); bgmEl.src=""; } }
   function syncBGMVolume() { if(bgmEl) bgmEl.volume=bgmV(); }
   return { SFX, startBGM, stopBGM, syncBGMVolume };
