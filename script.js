@@ -105,13 +105,14 @@ const Audio = (() => {
     };
 
     // Always try to resume AudioContext before playing
-    if (!ctx) {
-      doPlay();
-    } else if (ctx.state === "suspended" || ctx.state === "interrupted") {
-      ctx.resume().then(doPlay).catch(doPlay);
-    } else {
-      doPlay();
-    }
+    
+    const ac = getCtx(); // always get context
+
+if (ac.state === "suspended" || ac.state === "interrupted") {
+  ac.resume().then(doPlay).catch(doPlay);
+} else {
+  doPlay();
+}
   }
   function stopBGM()       { if(bgmEl){ bgmEl.pause(); bgmEl.src=""; } }
   function syncBGMVolume() { if(bgmEl) bgmEl.volume=bgmV(); }
@@ -813,7 +814,9 @@ function startNextWave() {
   buildEnemyCards();
   updateChapterDisplay();
   state.audioStarted = true; 
-  Audio.startBGM(VILLAIN_WAVES[state.waveIndex].bgmKey);
+   if (Audio && typeof Audio.startBGM === "function") {
+    Audio.startBGM(VILLAIN_WAVES[state.waveIndex].bgmKey);
+  }
   state.phase = "hero";
   highlightActiveHero();
   refreshSkillBar();
